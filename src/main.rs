@@ -107,13 +107,13 @@ fn main() {
     // パターンを記憶する
     let left_pattern = im
         .pixels()
-        .filter_map(|p| if is_black(p.2.data) && p.0 == 0 { Some(p) } else { None })
+        .filter_map(|p| if p.0 == 0 && is_black(p.2.data) { Some(p) } else { None })
         .map(|p| get_left_top_pos_of_4px((p.0, p.1), &im).1)
         .collect::<Vec<u32>>();
 
     let top_pattern = im
         .pixels()
-        .filter_map(|p| if is_black(p.2.data) && p.1 == 0 { Some(p) } else { None })
+        .filter_map(|p| if p.1 == 0 && is_black(p.2.data) { Some(p) } else { None })
         .map(|p| get_left_top_pos_of_4px((p.0, p.1), &im).0)
         .collect::<Vec<u32>>();
 
@@ -168,9 +168,8 @@ fn main() {
             target
         }
     });
-    let mut d = cartesian(&top_pattern, &left_pattern);
     let mut poss = cartesian(&second_top_pattern, &second_left_pattern);
-    poss.append(&mut d);
+    poss.append(&mut cartesian(&top_pattern, &left_pattern));
     for (x, y) in poss {
         let result = check_convert((x, y), &im);
         if result.0 {
