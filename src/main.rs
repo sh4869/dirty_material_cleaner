@@ -1,10 +1,30 @@
 //! An example of opening an image.
+#![feature(slice_patterns)]
+
 extern crate image;
 
 use std::env;
 use std::path::Path;
 
 use image::GenericImageView;
+
+fn cartesian<T: Copy, U: Copy>(mut a: &[T], mut b: &[U]) -> Vec<(T, U)> {
+    let mut out = Vec::new();
+    let b_copy = b;
+    loop {
+        match (a, b) {
+            (&[], _) => return out,
+            (&[_, ref at..], &[]) => {
+                a = at;
+                b = b_copy;
+            }
+            (&[ae, ..], &[be, ref bt..]) => {
+                out.push((ae, be));
+                b = bt;
+            }
+        }
+    }
+}
 
 fn is_it_same_x_line(a: (u32, u32), b: (u32, u32)) -> bool {
     return a.0 == b.0 || a.0 == b.0 + 1 || a.0 + 1 == b.0;
@@ -148,26 +168,22 @@ fn main() {
             target
         }
     });
-
-    for y in 0..height {
-        for x in 0..width {
-            if (left_pattern.iter().find(|&&l| l == y).is_some() && top_pattern.iter().find(|&&t| t == x).is_some())
-                || (second_left_pattern.iter().find(|&&l| l == y).is_some() && second_top_pattern.iter().find(|&&t| t == x).is_some())
-            {
-                let result = check_convert((x, y), &im);
-                if result.0 {
-                    imgbuf.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
-                }
-                if result.1 {
-                    imgbuf.put_pixel(x + 1, y, image::Rgba([255, 255, 255, 255]));
-                }
-                if result.2 {
-                    imgbuf.put_pixel(x, y + 1, image::Rgba([255, 255, 255, 255]));
-                }
-                if result.3 {
-                    imgbuf.put_pixel(x + 1, y + 1, image::Rgba([255, 255, 255, 255]));
-                }
-            }
+    let mut d = cartesian(&top_pattern, &left_pattern);
+    let mut poss = cartesian(&second_top_pattern, &second_left_pattern);
+    poss.append(&mut d);
+    for (x, y) in poss {
+        let result = check_convert((x, y), &im);
+        if result.0 {
+            imgbuf.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
+        }
+        if result.1 {
+            imgbuf.put_pixel(x + 1, y, image::Rgba([255, 255, 255, 255]));
+        }
+        if result.2 {
+            imgbuf.put_pixel(x, y + 1, image::Rgba([255, 255, 255, 255]));
+        }
+        if result.3 {
+            imgbuf.put_pixel(x + 1, y + 1, image::Rgba([255, 255, 255, 255]));
         }
     }
     // Write the contents of this image to the Writer in PNG format.
