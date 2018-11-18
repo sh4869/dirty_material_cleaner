@@ -49,21 +49,30 @@ fn get_left_top_pos_of_4px(target: (u32, u32), im: &image::DynamicImage) -> (u32
     return target;
 }
 
-fn check_surround_pixel_is_black(target: (u32, u32), im: &image::DynamicImage) -> bool {
+fn check_convert(target: (u32, u32), im: &image::DynamicImage) -> (bool, bool, bool, bool) {
+    // もしノイズがEdgeにあるなら問答無用で消してしまっていい
     let left = target.0 < 1;
     let right = target.0 + 2 > im.dimensions().0 - 1;
     let top = target.1 < 1;
     let bottom = target.1 + 2 > im.dimensions().1 - 1;
     if left || right || top || bottom {
-        return false;
+        return (true, true, true, true);
     }
+    // もしノイズが乗っているのが上下左右のうち一つなら消してしまっていい
     let left_black = !is_white(im.get_pixel(target.0 - 1, target.1).data) || !is_white(im.get_pixel(target.0 - 1, target.1 + 1).data);
     let right_black = !is_white(im.get_pixel(target.0 + 2, target.1).data) || !is_white(im.get_pixel(target.0 + 2, target.1 + 1).data);
     let top_black = !is_white(im.get_pixel(target.0, target.1 - 1).data) || !is_white(im.get_pixel(target.0 + 1, target.1 - 1).data);
     let bottom_black = !is_white(im.get_pixel(target.0, target.1 + 2).data) || !is_white(im.get_pixel(target.0 + 1, target.1 + 2).data);
     let mut result = vec![left_black, right_black, top_black, bottom_black];
     result.retain(|&v| v);
-    return result.iter().count() > 1;
+    if result.iter().count() < 2 {
+        return (true, true, true, true);
+    }
+    let left_top = is_white(im.get_pixel(target.0 - 1, target.1).data) && is_white(im.get_pixel(target.0, target.1 - 1).data);
+    let right_top = is_white(im.get_pixel(target.0 + 2, target.1).data) && is_white(im.get_pixel(target.0 + 1, target.1 - 1).data);
+    let left_bottom = is_white(im.get_pixel(target.0 - 1, target.1 + 1).data) && is_white(im.get_pixel(target.0, target.1 + 2).data);
+    let right_bottom = is_white(im.get_pixel(target.0 + 2, target.1 + 1).data) && is_white(im.get_pixel(target.0 + 2, target.1 + 1).data);
+    (left_top, right_top, left_bottom, right_bottom)
 }
 
 fn main() {
@@ -131,25 +140,31 @@ fn main() {
 
     // ノイズを消す
     let (width, height) = im.dimensions();
-    let mut imgbuf = image::RgbaImage::new(width, height);
-    for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
+    let mut imgbuf = image::RgbaImage::from_fn(width, height, |x, y| {
         let target = im.get_pixel(x, y);
         if is_white(target.data) {
-            *pixel = image::Rgba([255, 255, 255, 255]);
+            image::Rgba([255, 255, 255, 255])
         } else {
-            *pixel = target;
+            target
         }
-    }
+    });
 
     for y in 0..height {
         for x in 0..width {
             if (left_pattern.iter().find(|&&l| l == y).is_some() && top_pattern.iter().find(|&&t| t == x).is_some())
                 || (second_left_pattern.iter().find(|&&l| l == y).is_some() && second_top_pattern.iter().find(|&&t| t == x).is_some())
             {
-                if !check_surround_pixel_is_black((x, y), &im) {
+                let result = check_convert((x, y), &im);
+                if result.0 {
                     imgbuf.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
+                }
+                if result.1 {
                     imgbuf.put_pixel(x + 1, y, image::Rgba([255, 255, 255, 255]));
+                }
+                if result.2 {
                     imgbuf.put_pixel(x, y + 1, image::Rgba([255, 255, 255, 255]));
+                }
+                if result.3 {
                     imgbuf.put_pixel(x + 1, y + 1, image::Rgba([255, 255, 255, 255]));
                 }
             }
